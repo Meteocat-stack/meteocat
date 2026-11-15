@@ -3,11 +3,15 @@
 How has the weather changed where you live? meteocat compares the same day, date range
 or season across every year since 1985, for any place in Europe.
 
-Pick a place and a period, such as Bratislava in summer or 4 August. You get three
+Pick a place and a period, such as Bratislava in summer or 4 August. You get four
 cards, each with a one-line summary:
 
 - **Temperature:** the average day and night temperature for each year, with a bar
   from the coldest night to the warmest day.
+- **Hot and freezing days:** how many tropical days (maximum 30 °C or more), tropical
+  nights (minimum 20 °C or more), frost days (minimum below 0 °C) and ice days
+  (maximum below 0 °C) each year had. These are the standard definitions used by
+  Central European weather services.
 - **Rain and snow:** total rain (mm) and fresh snow (cm) for each year.
 - **Wind:** the average wind speed and the strongest gust for each year.
 

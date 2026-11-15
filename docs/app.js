@@ -9,7 +9,7 @@ const API = {
 };
 const FIRST_YEAR = 1985;
 const DAY = 864e5;
-const CACHE_PREFIX = 'mc3:';
+const CACHE_PREFIX = 'mc4:';
 // One consistent model for every year: ERA5-Land (temperature) + ERA5 (wind, rain, snow).
 // The default "best match" switches to ECMWF IFS from 2017, which shifts wind and rain and fakes trends.
 const MODEL = 'era5_seamless';
@@ -150,6 +150,9 @@ async function loadYear(place, Y) {
     Y, day: mean(dayT), night: mean(nightT),
     hi: hi.tmax, hiDate: hi.date, lo: lo.tmin, loDate: lo.date,
     rain: sum(days.map(d => d.rain)), rainDays: days.filter(d => d.rain >= 1).length,
+    // Standard day types: tropical day max >= 30 °C, tropical night min >= 20 °C, frost day min < 0 °C, ice day max < 0 °C.
+    tropDays: days.filter(d => d.tmax >= 30).length, tropNights: days.filter(d => d.tmin >= 20).length,
+    frostDays: days.filter(d => d.tmin < 0).length, iceDays: days.filter(d => d.tmax < 0).length,
     snow: sum(days.map(d => d.snow)), snowDays: days.filter(d => d.snow >= 0.5).length,
     wind: mean(wind), gust: gu.gust, gustDate: gu.date,
   };
@@ -311,9 +314,9 @@ async function update() {
   const my = ++token, place = state.place, years = yearsRange();
   const meta = `${periodName()} · ${yearLabel(years[0])}–${yearLabel(years[years.length - 1])}`;
   document.querySelectorAll('[data-meta]').forEach(el => { el.textContent = meta; });
-  ['c-temp', 'c-rain', 'c-wind'].forEach(id => { const el = document.getElementById(id); el.innerHTML = ''; el.classList.add('loading'); });
+  ['c-temp', 'c-heat', 'c-rain', 'c-wind'].forEach(id => { const el = document.getElementById(id); el.innerHTML = ''; el.classList.add('loading'); });
   $('#c-snow').innerHTML = '';
-  ['hl-temp', 'hl-rain', 'hl-wind'].forEach(id => { document.getElementById(id).textContent = ''; });
+  ['hl-temp', 'hl-heat', 'hl-rain', 'hl-wind'].forEach(id => { document.getElementById(id).textContent = ''; });
 
   let done = 0, waiting = false;
   const progress = () => {
@@ -344,7 +347,7 @@ function clearLoading() { document.querySelectorAll('.chart.loading').forEach(el
 function draw() {
   clearLoading();
   if (!rows.length) return;
-  drawTemp(); drawRain(); drawWind();
+  drawTemp(); drawHeat(); drawRain(); drawWind();
 }
 
 // ---------- headlines ----------
@@ -363,8 +366,30 @@ function tempHeadline() {
   const trend = ` Across the last ten years (${span(late)}), days were ${warmer(dd)} and nights ${warmer(nn)} on average.`;
   return latest + trend + (periodWord() === 'day' ? ' A single day swings a lot from year to year.' : '');
 }
+// Latest year against the first ten years; for a single day, in how many years it happened.
+const avgOf = (a, k) => { const v = mean(a.map(r => r[k])); return v < 10 ? r1(v).replace(/\.0$/, '') : r0(v); };
+const many = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+function heatHeadline() {
+  const early = rows.slice(0, 10), late = rows.slice(-10), last = rows[rows.length - 1];
+  const has = k => rows.some(r => r[k] > 0);
+  const hot = has('tropDays') || has('tropNights'), cold = has('frostDays') || has('iceDays');
+  if (!hot && !cold) return `No tropical or freezing days in any of these ${periodWord() === 'day' ? 'years' : periodWord() + 's'}.`;
+  if (periodWord() === 'day') {
+    const cnt = (a, k) => a.filter(r => r[k] > 0).length, parts = [];
+    if (has('tropDays')) parts.push(`a <b>tropical day</b> in ${cnt(rows, 'tropDays')} of ${rows.length} years (${cnt(late, 'tropDays')} of the last ten)`);
+    if (has('tropNights')) parts.push(`with a <b>tropical night</b> in ${cnt(rows, 'tropNights')}`);
+    if (has('frostDays')) parts.push(`<b>below freezing</b> in ${cnt(rows, 'frostDays')} of ${rows.length} years (${cnt(late, 'frostDays')} of the last ten)`);
+    if (has('iceDays')) parts.push(`below freezing <b>all day</b> in ${cnt(rows, 'iceDays')}`);
+    return `${fmtMD(state.from)} was ${parts.join(', ')}.`;
+  }
+  const what = `${periodName()} ${yearLabel(last.Y)}`, out = [];
+  if (hot) out.push(`${what} had <b>${many(last.tropDays, 'tropical day')}</b> and <b>${many(last.tropNights, 'tropical night')}</b>. The ${span(early)} average was ${avgOf(early, 'tropDays')} and ${avgOf(early, 'tropNights')}.`);
+  if (cold) out.push(`${hot ? 'It also had' : `${what} had`} <b>${many(last.frostDays, 'frost day')}</b> and <b>${many(last.iceDays, 'ice day')}</b>. The ${span(early)} average was ${avgOf(early, 'frostDays')} and ${avgOf(early, 'iceDays')}.`);
+  return out.join(' ');
+}
 function headlines() {
   $('#hl-temp').innerHTML = tempHeadline();
+  $('#hl-heat').innerHTML = heatHeadline();
   const wet = best('rain', (a, b) => a > b), dry = best('rain', (a, b) => a < b), snowy = best('snow', (a, b) => a > b);
   $('#hl-rain').innerHTML = `Wettest: <b>${yearLabel(wet.Y)}</b> (${r0(wet.rain)} mm). Driest: <b>${yearLabel(dry.Y)}</b> (${r0(dry.rain)} mm).`
     + (snowy.snow >= 1 ? ` Snowiest: <b>${yearLabel(snowy.Y)}</b> (${r0(snowy.snow)} cm).` : '');
@@ -409,6 +434,31 @@ function drawTemp() {
     ],
   }));
   headlines();
+}
+// Heat counts go up from the axis, freezing counts hang down; the narrow bar inside is the stricter count.
+function drawHeat() {
+  const el = $('#c-heat'), bw = barWidth(el), thin = Math.max(1.5, bw * 0.4);
+  const up = d3.max(rows, r => Math.max(r.tropDays, r.tropNights)) || 0;
+  const down = d3.max(rows, r => Math.max(r.frostDays, r.iceDays)) || 0;
+  document.querySelectorAll('#c-heat ~ .legend [data-k]').forEach(s => { s.hidden = s.dataset.k === 'hot' ? !up : !down; });
+  if (!up && !down) { el.classList.remove('loading'); el.innerHTML = ''; return; }
+  const title = r => [yearLabel(r.Y),
+    ...(up ? [`Tropical days  ${r.tropDays}`, `Tropical nights  ${r.tropNights}`] : []),
+    ...(down ? [`Frost days  ${r.frostDays}`, `Ice days  ${r.iceDays}`] : [])].join('\n');
+  mount('c-heat', Plot.plot({
+    ...base(el, up && down ? 230 : 170),
+    y: yGrid({ domain: [-down, up], tickFormat: v => `${Math.abs(v)}` }),
+    marks: [
+      Plot.ruleY([0], { stroke: cv('--hair') }),
+      up && Plot.ruleX(rows, { x: 'Y', y1: 0, y2: 'tropDays', stroke: cv('--hot'), strokeWidth: bw }),
+      up && Plot.ruleX(rows, { x: 'Y', y1: 0, y2: 'tropNights', stroke: cv('--hot-night'), strokeWidth: thin }),
+      down && Plot.ruleX(rows, { x: 'Y', y1: 0, y2: r => -r.frostDays, stroke: cv('--frost'), strokeWidth: bw }),
+      down && Plot.ruleX(rows, { x: 'Y', y1: 0, y2: r => -r.iceDays, stroke: cv('--ice'), strokeWidth: thin }),
+      Plot.ruleX(rows, Plot.pointerX({ x: 'Y', stroke: cv('--ink-3'), strokeDasharray: '2,3' })),
+      Plot.tip(rows, Plot.pointerX({ x: 'Y', y: r => (up ? Math.max(r.tropDays, r.tropNights) : -Math.max(r.frostDays, r.iceDays)), title, ...tip() })),
+      Plot.text(['days'], { frameAnchor: 'top-left', dx: -32, dy: -20, fill: cv('--ink-3') }),
+    ].filter(Boolean),
+  }));
 }
 function drawRain() {
   const el = $('#c-rain'), bw = barWidth(el);
