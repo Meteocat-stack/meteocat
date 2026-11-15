@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>meteocat</title>
+  <meta name="description" content="How has the weather changed where you live? Compare the same days across 35 years.">
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <!-- Site settings: fill these two in before release.
+       goatcounter = your GoatCounter code (the "xyz" in xyz.goatcounter.com); empty = no visitor stats.
+       contact     = the public contact email shown under About and privacy. -->
+  <meta name="mc:goatcounter" content="">
+  <meta name="mc:contact" content="">
+  <link rel="stylesheet" href="style.css?v=10">
+  <script src="vendor/d3.min.js" defer></script>
+  <script src="vendor/plot.umd.min.js" defer></script>
+  <script src="app.js?v=10" defer></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="./" aria-label="meteocat home">
+      <svg class="icon" viewBox="0 0 92 92" aria-hidden="true">
+        <rect width="92" height="92" rx="22" fill="#185FA5"/>
+        <circle cx="62" cy="32" r="20" fill="#EF9F27"/>
+        <path d="M20 80 V38 L30 50 H50 L60 38 V80 Z" fill="#E6F1FB"/>
+        <circle cx="32" cy="62" r="2.6" fill="#185FA5"/><circle cx="48" cy="62" r="2.6" fill="#185FA5"/>
+      </svg>
+      <span class="wordmark">meteo<span class="cat">cat</span></span>
+    </a>
+    <button id="share" class="link-btn" type="button">Share</button>
+  </header>
+
+  <main class="wrap">
+    <section class="controls" aria-label="Choose a place and dates">
+      <label class="ask" for="q">Where's your weather?</label>
+      <div class="search">
+        <svg class="mag" viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="q" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Bratislava, Tatras, Lake Balaton…"
+               role="combobox" aria-expanded="false" aria-controls="sugg" aria-autocomplete="list">
+        <button id="geo" class="geo" type="button" title="Use my location" aria-label="Use my location">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 9.5L17 3l-6.5 14-1.6-5.9z" fill="currentColor"/></svg>
+        </button>
+        <ul id="sugg" class="sugg" role="listbox" hidden></ul>
+      </div>
+      <p id="placeInfo" class="place"></p>
+
+      <div class="when">
+        <button id="dateBtn" class="date-pill" type="button" aria-expanded="false" aria-controls="datePanel">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4.5" width="14" height="12.5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 8.5h14M7 3v3M13 3v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span id="dateLabel"></span>
+        </button>
+        <div class="seg" id="seasons" role="radiogroup" aria-label="Season"></div>
+      </div>
+
+      <div id="datePanel" class="date-panel" hidden>
+        <div class="seg small" id="mode" role="radiogroup" aria-label="Date type">
+          <button type="button" role="radio" data-mode="one">One day</button>
+          <button type="button" role="radio" data-mode="range">Range</button>
+        </div>
+        <div class="dp-row"><span id="fromLbl">From</span><select id="fd" aria-label="Start day"></select><select id="fm" aria-label="Start month"></select></div>
+        <div class="dp-row" id="toRow"><span>To</span><select id="td" aria-label="End day"></select><select id="tm" aria-label="End month"></select></div>
+        <button id="dateDone" class="done" type="button">Show</button>
+      </div>
+    </section>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <section class="card">
+      <div class="card-head"><h2>Temperature</h2><span class="meta" data-meta></span></div>
+      <p class="headline" id="hl-temp"></p>
+      <div class="chart" id="c-temp" role="img" aria-label="Average day and night temperature for each year"></div>
+      <div class="legend">
+        <span><i class="dot day"></i>Day average</span>
+        <span><i class="dot night"></i>Night average</span>
+        <span><i class="bar range"></i>Coldest night to warmest day</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Rain and snow</h2><span class="meta" data-meta></span></div>
+      <p class="headline" id="hl-rain"></p>
+      <div class="chart" id="c-rain" role="img" aria-label="Total rain for each year in millimetres"></div>
+      <div class="chart" id="c-snow" role="img" aria-label="Total fresh snow for each year in centimetres"></div>
+      <div class="legend">
+        <span><i class="sq rain"></i>Rain, mm</span>
+        <span><i class="sq snow"></i>Fresh snow, cm</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><h2>Wind</h2><span class="meta" data-meta></span></div>
+      <p class="headline" id="hl-wind"></p>
+      <div class="chart" id="c-wind" role="img" aria-label="Average wind speed and strongest gust for each year"></div>
+      <div class="legend">
+        <span><i class="dot wind"></i>Average speed</span>
+        <span><i class="dot gust"></i>Strongest gust</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), contains modified Copernicus Climate Change Service information.
+    Places from GeoNames and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a>.</p>
+    <p>Modelled values for a ~10–25 km area, not official station measurements. <button id="aboutBtn" class="text-btn" type="button">About and privacy</button></p>
+  </footer>
+
+  <dialog id="about" class="sheet" aria-labelledby="aboutTitle">
+    <form method="dialog" class="sheet-close"><button aria-label="Close">Done</button></form>
+    <h2 id="aboutTitle">About meteocat</h2>
+    <p>meteocat compares the same days or seasons across every year since 1985, for any place in Europe. It's a non-commercial hobby project.</p>
+
+    <h3>How to read the numbers</h3>
+    <p>All values come from the ERA5 and ERA5-Land climate reanalysis: a weather model fed with decades of observations. Each value describes an area of roughly 10–25 km, not one weather station, and uses the same model for every year so years can be compared fairly.</p>
+    <p>Small, short events such as tornadoes, hail or a single thunderstorm are often too local to appear. The data is provided as is, without warranty. Don't use it for safety, insurance or legal decisions; for those, ask your national weather service.</p>
+
+    <h3>Privacy</h3>
+    <ul>
+      <li><b>No cookies, no tracking, no ads.</b> Nothing about you is sold or shared.</li>
+      <li><b>Visitor statistics</b> are counted with <a href="https://www.goatcounter.com/help/privacy" target="_blank" rel="noopener">GoatCounter</a>, which doesn't use cookies or store IP addresses. It only records anonymous totals: page, country or region, browser type and where the visit came from.</li>
+      <li><b>Saved in your browser:</b> weather already loaded (so it opens faster next time) and your recent places. It never leaves your device. Clearing this site's data in your browser removes it.</li>
+      <li><b>Services your browser talks to:</b> to show the weather, your browser sends the place and dates you pick to Open-Meteo (Switzerland). Place search goes to Open-Meteo and to Photon by komoot (Germany). Like any website request, these services see your IP address. "Use my location" asks your permission first, and your position is only used to look up the weather.</li>
+    </ul>
+    <p id="contactLine">Questions or requests about your data: <span id="contact">contact address coming soon</span>.</p>
+
+    <h3>Credits</h3>
+    <p>Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a>, CC BY 4.0. Generated using Copernicus Climate Change Service information (ERA5, ERA5-Land, ECMWF).
+    Places: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a> (CC BY 4.0) and <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap contributors</a> via <a href="https://photon.komoot.io" target="_blank" rel="noopener">Photon</a>.
+    Flags: <a href="https://flagpedia.net/" target="_blank" rel="noopener">Flagpedia</a>. Charts: <a href="https://observablehq.com/plot/" target="_blank" rel="noopener">Observable Plot</a> and D3. Font: Inter.</p>
+  </dialog>
+</body>
+</html>

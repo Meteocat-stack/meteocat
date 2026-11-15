@@ -1,0 +1,15 @@
+# Local tool settings (preview server config, editor state)
+.claude/
+.vscode/
+.idea/
+
+# Operating system clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs, secrets and dependencies, in case they ever appear
+*.log
+.env
+.env.*
+node_modules/
